@@ -9,8 +9,8 @@ import (
 )
 
 func main() {
-	fmt.Println("String Identifiar via Regex.")
-	fmt.Print("Team Members: Christopher Jáquez\nHomero González\n\n")
+	fmt.Println("String Identifier via Regex.")
+	fmt.Print("Team Members:\nChristopher Jáquez\nHomero González\n\n")
 
 	for {
 		fmt.Print("Enter a string: ")
@@ -54,7 +54,7 @@ func identifyString(str string) {
 	}
 
 	// URL Match
-	re = regexp.MustCompile(`(?is)^[a-z][a-z.+\-]*:?(\/\/)?[a-z0-9[\]+\-.:@]*(\/[a-z0-9-._~:\/?#[\]@!$&'()*+,;=.%]*)?`)
+	re = regexp.MustCompile(`(?is)^(?:[a-z]+:\/\/)?(:?[a-z0-9]*\.)+[a-z]+(?:\/[a-z0-9\/\?_\(\)\%\#\&\.\=\-]*)?`)
 
 	if len(re.FindStringIndex(str)) > 0 {
 		fmt.Println("You have entered a URL.")
@@ -94,10 +94,9 @@ func identifyString(str string) {
 	}
 
 	// HTML Tag
-	re = regexp.MustCompile(`(?is)<(.|\n)*?>`)
-	reAlternate := regexp.MustCompile(`(?is)^(<[a-z]+.*)((>.*?<\/[a-z]+[a-z0-9]*>)|(\/ *>))`)
+	re = regexp.MustCompile(`(?is)^(<[a-z]+.*)((>.*?<\/[a-z]+[a-z0-9]*>)|(\/ *>))`)
 
-	if len(re.FindStringIndex(str)) > 0 || len(reAlternate.FindStringIndex(str)) > 0 {
+	if len(re.FindStringIndex(str)) > 0 {
 		fmt.Println("You have entered an HTML tag.")
 		return
 	}
