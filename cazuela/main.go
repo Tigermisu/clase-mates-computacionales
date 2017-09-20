@@ -1,7 +1,8 @@
 package main
 
 import (
-	"clase-mates-computacionales/cazuela/cazuela"
+	"clase-mates-computacionales/cazuela/errorHandler"
+	"clase-mates-computacionales/cazuela/lexer"
 	"clase-mates-computacionales/utilities"
 	"fmt"
 	"os"
@@ -11,7 +12,7 @@ func main() {
 	args := os.Args
 	if len(args) > 2 {
 		fmt.Println("Uso: cazuela [archivo]")
-		cazuela.RaiseErrorWithCode(cazuela.CodeTooManyArguments)
+		errorHandler.RaiseErrorWithCode(errorHandler.CodeTooManyArguments)
 	} else if len(args) == 2 {
 		file := utilities.LoadFile(args[1])
 		execute(file)
@@ -21,7 +22,7 @@ func main() {
 }
 
 func startLineInterpreter() {
-	cazuela.IgnoreFatals = true
+	errorHandler.IgnoreFatals = true
 	for {
 		fmt.Print("<Cazuela># ")
 		input := utilities.GetConsoleInput()
@@ -30,7 +31,7 @@ func startLineInterpreter() {
 }
 
 func execute(command string) {
-	tokens := cazuela.GetTokens(command)
+	tokens := lexer.GetTokens(command)
 	for _, v := range tokens {
 		fmt.Println(v)
 	}
