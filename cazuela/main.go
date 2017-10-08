@@ -3,7 +3,9 @@ package main
 import (
 	"clase-mates-computacionales/cazuela/errorHandler"
 	"clase-mates-computacionales/cazuela/lexer"
+	"clase-mates-computacionales/cazuela/parser"
 	"clase-mates-computacionales/utilities"
+	"encoding/json"
 	"fmt"
 	"os"
 )
@@ -32,7 +34,10 @@ func startLineInterpreter() {
 
 func execute(command string) {
 	tokens := lexer.GetTokens(command)
-	for _, v := range tokens {
-		fmt.Println(v)
-	}
+	expr := parser.Parse(tokens)
+
+	fmt.Println(expr)
+
+	b, _ := json.MarshalIndent(expr, "", "  ")
+	fmt.Println(string(b))
 }

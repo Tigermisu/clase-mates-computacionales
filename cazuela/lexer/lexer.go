@@ -75,10 +75,10 @@ var keywords = map[string]int{
 
 // A Token represents a token as interpreted by the lexer
 type Token struct {
-	tokenType int
-	lexeme    string
-	literal   interface{}
-	line      int
+	TokenType int
+	Lexeme    string
+	Literal   interface{}
+	Line      int
 }
 
 // Scan control and progress variables
@@ -88,7 +88,7 @@ var rawCommand string
 var tokens []Token
 
 func (t Token) String() string {
-	return fmt.Sprintf("(0x%X) %v - %v", t.tokenType, t.lexeme, t.literal)
+	return fmt.Sprintf("(0x%X) %v - %v", t.TokenType, t.Lexeme, t.Literal)
 }
 
 // GetTokens takes a command string, and returns an array of all the tokens identified.
@@ -187,8 +187,8 @@ func scanNextToken() {
 	}
 }
 
-func addToken(tokenType int) {
-	addTokenWithLiteral(tokenType, nil)
+func addToken(TokenType int) {
+	addTokenWithLiteral(TokenType, nil)
 }
 
 func addTokenIfMatch(m rune, tokenIfMatch int, tokenElse int) {
@@ -199,9 +199,9 @@ func addTokenIfMatch(m rune, tokenIfMatch int, tokenElse int) {
 	}
 }
 
-func addTokenWithLiteral(tokenType int, literal interface{}) {
-	lexeme := rawCommand[start:currentPosition]
-	tokens = append(tokens, Token{tokenType, lexeme, literal, line})
+func addTokenWithLiteral(TokenType int, Literal interface{}) {
+	Lexeme := rawCommand[start:currentPosition]
+	tokens = append(tokens, Token{TokenType, Lexeme, Literal, line})
 }
 
 func match(m rune) bool {
@@ -255,10 +255,10 @@ func parseNumberLexeme() {
 		}
 	}
 
-	literal, err := strconv.ParseFloat(rawCommand[start:currentPosition], 64)
+	Literal, err := strconv.ParseFloat(rawCommand[start:currentPosition], 64)
 	utilities.AssertError(err)
 
-	addTokenWithLiteral(TokenNumber, literal)
+	addTokenWithLiteral(TokenNumber, Literal)
 }
 
 func parseIdentifier() {
@@ -289,7 +289,7 @@ func parseStringLexeme() {
 	} else {
 		currentPosition++
 
-		literal := rawCommand[start+1 : currentPosition-1]
-		addTokenWithLiteral(TokenString, literal)
+		Literal := rawCommand[start+1 : currentPosition-1]
+		addTokenWithLiteral(TokenString, Literal)
 	}
 }
