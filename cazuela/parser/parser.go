@@ -28,45 +28,45 @@ const (
 
 // Expression is the base interface for all expressions
 type Expression interface {
-	getType() int
+	GetType() int
 }
 
 // A BinaryExpression holds a expression with two other expressions and an operator in the middle
 type BinaryExpression struct {
-	left     Expression
-	operator lexer.Token
-	right    Expression
+	Left     Expression
+	Operator lexer.Token
+	Right    Expression
 }
 
 // A LiteralExpression holds a simple literal
 type LiteralExpression struct {
-	value interface{}
+	Value interface{}
 }
 
 // A GroupingExpression holds more expressions inside it :D
 type GroupingExpression struct {
-	expression Expression
+	Expression Expression
 }
 
 // An UnaryExpression has only one operator and an expression to the right of it
 type UnaryExpression struct {
-	operator lexer.Token
-	right    Expression
+	Operator lexer.Token
+	Right    Expression
 }
 
-func (be BinaryExpression) getType() int {
+func (be BinaryExpression) GetType() int {
 	return TypeBinary
 }
 
-func (le LiteralExpression) getType() int {
+func (le LiteralExpression) GetType() int {
 	return TypeLiteral
 }
 
-func (ge GroupingExpression) getType() int {
+func (ge GroupingExpression) GetType() int {
 	return TypeGrouping
 }
 
-func (ue UnaryExpression) getType() int {
+func (ue UnaryExpression) GetType() int {
 	return TypeUnary
 }
 
@@ -92,7 +92,7 @@ func equality() Expression {
 	for match(lexer.TokenNotEqualTo, lexer.TokenEqualEqual) {
 		operator := previous()
 		right := comparison()
-		expr = BinaryExpression{left: expr, operator: operator, right: right}
+		expr = BinaryExpression{Left: expr, Operator: operator, Right: right}
 	}
 
 	return expr
@@ -104,7 +104,7 @@ func comparison() Expression {
 	for match(lexer.TokenGreaterThan, lexer.TokenGreaterEqual, lexer.TokenLessThan, lexer.TokenLessEqual) {
 		operator := previous()
 		right := addition()
-		expr = BinaryExpression{left: expr, operator: operator, right: right}
+		expr = BinaryExpression{Left: expr, Operator: operator, Right: right}
 	}
 
 	return expr
@@ -116,7 +116,7 @@ func addition() Expression {
 	for match(lexer.TokenMinus, lexer.TokenPlus) {
 		operator := previous()
 		right := multiplication()
-		expr = BinaryExpression{left: expr, operator: operator, right: right}
+		expr = BinaryExpression{Left: expr, Operator: operator, Right: right}
 	}
 
 	return expr
@@ -128,7 +128,7 @@ func multiplication() Expression {
 	for match(lexer.TokenMult, lexer.TokenDivision, lexer.TokenModulo) {
 		operator := previous()
 		right := unary()
-		expr = BinaryExpression{left: expr, operator: operator, right: right}
+		expr = BinaryExpression{Left: expr, Operator: operator, Right: right}
 	}
 
 	return expr
@@ -138,7 +138,7 @@ func unary() Expression {
 	if match(lexer.TokenNotEqualTo, lexer.TokenMinus) {
 		operator := previous()
 		right := unary()
-		return UnaryExpression{operator: operator, right: right}
+		return UnaryExpression{Operator: operator, Right: right}
 	}
 
 	return primary()
@@ -146,19 +146,19 @@ func unary() Expression {
 
 func primary() Expression {
 	if match(lexer.TokenFalse) {
-		return LiteralExpression{value: false}
+		return LiteralExpression{Value: false}
 	}
 
 	if match(lexer.TokenTrue) {
-		return LiteralExpression{value: true}
+		return LiteralExpression{Value: true}
 	}
 
 	if match(lexer.TokenNull) {
-		return LiteralExpression{value: nil}
+		return LiteralExpression{Value: nil}
 	}
 
 	if match(lexer.TokenNumber, lexer.TokenString) {
-		return LiteralExpression{value: previous().Literal}
+		return LiteralExpression{Value: previous().Literal}
 	}
 
 	if match(lexer.TokenLeftParentheses) {
@@ -167,7 +167,8 @@ func primary() Expression {
 		return GroupingExpression{expr}
 	}
 
-	panic("Unknown token")
+	errorHandler.RaiseError(errorHandler.CodeSyntaxError, fmt.Sprintf("Elemento desconocido: %v", peek().Lexeme), peek().Line, "[Cocinado]", true)
+	return nil
 }
 
 func consume(tokenType int, message string) lexer.Token {

@@ -16,6 +16,7 @@ const (
 
 // IgnoreFatals when true prevents the program from exiting during fatal errors
 var IgnoreFatals = false
+var HasFatalled = false
 
 // A MenudoError represents a general error during the interpretation of the program
 type MenudoError struct {
@@ -44,6 +45,10 @@ func RaiseError(code int, message string, line int, context string, fatal bool) 
 		HaltExecutionWithError(mError)
 	} else {
 		fmt.Println(mError)
+	}
+
+	if fatal {
+		HasFatalled = true
 	}
 }
 
