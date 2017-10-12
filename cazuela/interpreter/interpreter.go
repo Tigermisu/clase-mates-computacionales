@@ -28,7 +28,7 @@ func getUnaryValue(expr parser.UnaryExpression) interface{} {
 	case lexer.TokenMinus:
 		checkNumberOperand(expr.Operator, right)
 		return -right.(float64)
-	case lexer.TokenNotEqualTo:
+	case lexer.TokenNegation:
 		return !isTruthy(right)
 	}
 

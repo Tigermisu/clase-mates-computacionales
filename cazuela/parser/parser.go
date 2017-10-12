@@ -11,7 +11,8 @@ expression     → equality ;
 equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 comparison     → addition ( ( ">" | ">=" | "<" | "<=" ) addition )* ;
 addition       → multiplication ( ( "-" | "+" ) multiplication )* ;
-multiplication → unary ( ( "/" | "*" | "%" ) unary )* ;
+multiplication → exponentiation ( ( "/" | "*" | "%" ) exponentiation )* ;
+exponentiation → unary ( ( "^" ) unary )* ;
 unary          → ( "!" | "-" ) unary ;
                | primary ;
 primary        → NUMBER | STRING | "false" | "true" | "nil"
@@ -123,9 +124,21 @@ func addition() Expression {
 }
 
 func multiplication() Expression {
-	expr := unary()
+	expr := exponentiation()
 
 	for match(lexer.TokenMult, lexer.TokenDivision, lexer.TokenModulo) {
+		operator := previous()
+		right := exponentiation()
+		expr = BinaryExpression{Left: expr, Operator: operator, Right: right}
+	}
+
+	return expr
+}
+
+func exponentiation() Expression {
+	expr := unary()
+
+	for match(lexer.TokenExponentation) {
 		operator := previous()
 		right := unary()
 		expr = BinaryExpression{Left: expr, Operator: operator, Right: right}
@@ -135,7 +148,7 @@ func multiplication() Expression {
 }
 
 func unary() Expression {
-	if match(lexer.TokenNotEqualTo, lexer.TokenMinus) {
+	if match(lexer.TokenNegation, lexer.TokenMinus) {
 		operator := previous()
 		right := unary()
 		return UnaryExpression{Operator: operator, Right: right}
