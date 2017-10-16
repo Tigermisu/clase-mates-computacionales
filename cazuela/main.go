@@ -40,12 +40,12 @@ func execute(command string) {
 		return
 	}
 
-	expr := parser.Parse(tokens)
+	statements := parser.Parse(tokens)
 
 	if errorHandler.HasFatalled {
 		errorHandler.HasFatalled = false
 		return
 	}
 
-	interpreter.Interpret(expr)
+	interpreter.Interpret(statements)
 }

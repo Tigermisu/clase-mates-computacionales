@@ -117,6 +117,9 @@ func scanNextToken() {
 	currentPosition++
 
 	switch character {
+	case ';':
+		addToken(TokenSemiColon)
+		break
 	case '+':
 		addToken(TokenPlus)
 		break

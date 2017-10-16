@@ -1,16 +1,58 @@
 package interpreter
 
 import (
+	"clase-mates-computacionales/cazuela/environment"
 	"clase-mates-computacionales/cazuela/errorHandler"
 	"clase-mates-computacionales/cazuela/lexer"
 	"clase-mates-computacionales/cazuela/parser"
 	"fmt"
 	"math"
+	"strconv"
 )
 
+var env environment.Environment
+
 // Interpret takes an AST and interprets it (magic!)
-func Interpret(expr parser.Expression) {
-	fmt.Println(evaluate(expr))
+func Interpret(stmts []parser.Stmt) {
+	defer func() {
+		if err := recover(); err != nil {
+			errorHandler.RaiseError(errorHandler.CodeRuntimeError, "Error interno en tiempo de ejecución", -1, fmt.Sprintf("%v", err), true)
+		}
+	}()
+
+	env = environment.Environment{make(map[string]interface{})}
+
+	for _, s := range stmts {
+		execute(s)
+	}
+}
+
+func execute(s parser.Stmt) {
+	if v, ok := s.(parser.Statement); ok {
+		evaluateStatement(v)
+	} else if v, ok := s.(parser.Print); ok {
+		evaluatePrint(v)
+	} else if v, ok := s.(parser.Declaration); ok {
+		evaluateDeclaration(v)
+	}
+}
+
+func evaluateDeclaration(st parser.Declaration) {
+	var value interface{}
+	if st.Initializer != nil {
+		value = evaluate(st.Initializer)
+	}
+
+	env.Define(st.Name.Lexeme, value)
+}
+
+func evaluateStatement(st parser.Statement) {
+	evaluate(st.Expr)
+}
+
+func evaluatePrint(st parser.Print) {
+	value := evaluate(st.Expr)
+	fmt.Println(value)
 }
 
 func getLiteralValue(expr parser.LiteralExpression) interface{} {
@@ -66,8 +108,14 @@ func getBinaryValue(expr parser.BinaryExpression) interface{} {
 		leftString, isLString := left.(string)
 		rightString, isRString := right.(string)
 
-		if isLString && isRString {
-			return leftString + rightString
+		if isLString || isRString {
+			if isLString && !isRString {
+				return leftString + strconv.FormatFloat(r, 'f', -1, 64)
+			} else if !isLString && isRString {
+				return strconv.FormatFloat(l, 'f', -1, 64) + rightString
+			} else {
+				return leftString + rightString
+			}
 		}
 
 		errorHandler.RaiseError(errorHandler.CodeRuntimeError, fmt.Sprintf("Se esperaba números o cadenas para %v", expr.Operator.Lexeme), expr.Operator.Line, "[Suma]", true)
@@ -143,6 +191,8 @@ func evaluate(expr parser.Expression) interface{} {
 		return getUnaryValue(v)
 	} else if v, ok := expr.(parser.BinaryExpression); ok {
 		return getBinaryValue(v)
+	} else if v, ok := expr.(parser.VariableExpression); ok {
+		return env.Get(v.Name)
 	}
 
 	return nil

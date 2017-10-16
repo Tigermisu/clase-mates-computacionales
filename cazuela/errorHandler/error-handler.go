@@ -7,11 +7,12 @@ import (
 
 // error codes
 const (
-	CodeAllGood          = 0x00
-	CodeSyntaxError      = 0x01
-	CodeTooManyArguments = 0x02
-	CodeRuntimeError     = 0x03
-	CodeUnexpectedEOF    = 0x04
+	CodeAllGood           = 0x00
+	CodeSyntaxError       = 0x01
+	CodeTooManyArguments  = 0x02
+	CodeRuntimeError      = 0x03
+	CodeUnexpectedEOF     = 0x04
+	CodeUndefinedVariable = 0x05
 )
 
 // IgnoreFatals when true prevents the program from exiting during fatal errors

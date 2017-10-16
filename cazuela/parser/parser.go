@@ -7,6 +7,16 @@ import "fmt"
 /*
 Based on the formal grammar of Lox (http://www.craftinginterpreters.com/)
 
+program     → declaration* eof ;
+
+declaration → varDecl
+              | stmt ;
+
+varDecl → "var" IDENTIFIER ( "=" expression )? ";" ;
+
+stmt   		→ statement
+              | print ;
+
 expression     → equality ;
 equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 comparison     → addition ( ( ">" | ">=" | "<" | "<=" ) addition )* ;
@@ -14,9 +24,11 @@ addition       → multiplication ( ( "-" | "+" ) multiplication )* ;
 multiplication → exponentiation ( ( "/" | "*" | "%" ) exponentiation )* ;
 exponentiation → unary ( ( "^" ) unary )* ;
 unary          → ( "!" | "-" ) unary ;
-               | primary ;
-primary        → NUMBER | STRING | "false" | "true" | "nil"
-               | "(" expression ")" ;
+                 | primary ;
+primary        → "true" | "false" | "null" | "this"
+				 | NUMBER | STRING
+				 | "(" expression ")"
+				 | IDENTIFIER ;
 
 */
 
@@ -25,7 +37,29 @@ const (
 	TypeLiteral  = 0x11
 	TypeGrouping = 0x12
 	TypeUnary    = 0x13
+	TypeVariable = 0x14
+
+	TypeStatement   = 0x20
+	TypePrint       = 0x21
+	TypeDeclaration = 0x22
 )
+
+type Stmt interface {
+	GetStmtType() int
+}
+
+type Statement struct {
+	Expr Expression
+}
+
+type Print struct {
+	Expr Expression
+}
+
+type Declaration struct {
+	Name        lexer.Token
+	Initializer Expression
+}
 
 // Expression is the base interface for all expressions
 type Expression interface {
@@ -55,6 +89,22 @@ type UnaryExpression struct {
 	Right    Expression
 }
 
+type VariableExpression struct {
+	Name lexer.Token
+}
+
+func (st Statement) GetStmtType() int {
+	return TypeStatement
+}
+
+func (st Print) GetStmtType() int {
+	return TypePrint
+}
+
+func (st Declaration) GetStmtType() int {
+	return TypeDeclaration
+}
+
 func (be BinaryExpression) GetType() int {
 	return TypeBinary
 }
@@ -71,15 +121,78 @@ func (ue UnaryExpression) GetType() int {
 	return TypeUnary
 }
 
+func (ve VariableExpression) GetType() int {
+	return TypeVariable
+}
+
 var current int
 var tokens []lexer.Token
 
 // Parse takes a series of tokens and returns an AST
-func Parse(t []lexer.Token) Expression {
+func Parse(t []lexer.Token) []Stmt {
 	current = 0
 	tokens = t
 
-	return expression()
+	statements := make([]Stmt, 1)
+
+	for !isAtEnd() {
+		statements = append(statements, declaration())
+	}
+
+	return statements
+}
+
+func declaration() Stmt {
+	defer func() {
+		if err := recover(); err != nil {
+			errorHandler.RaiseError(errorHandler.CodeRuntimeError, "Error en cocinado", 0, "[Cocinado]", true)
+		}
+	}()
+
+	if match(lexer.TokenLet) {
+		return varDeclaration()
+	}
+
+	return statement()
+}
+
+func varDeclaration() Stmt {
+	name := consume(lexer.TokenIdentifier, "Se esperaba un nombre de variable.")
+
+	var initializer Expression
+
+	if match(lexer.TokenEqual) {
+		initializer = expression()
+	}
+
+	consume(lexer.TokenSemiColon, "Se esperaba un ; después de la declaración de la variable.")
+
+	return Declaration{Name: name, Initializer: initializer}
+
+}
+
+func statement() Stmt {
+	if match(lexer.TokenPrint) {
+		return printStatement()
+	}
+
+	return expressionStatement()
+}
+
+func printStatement() Stmt {
+	value := expression()
+
+	consume(lexer.TokenSemiColon, "Se buscaba un ; al final.")
+
+	return Print{value}
+}
+
+func expressionStatement() Stmt {
+	expr := expression()
+
+	consume(lexer.TokenSemiColon, "Se buscaba un ; al final.")
+
+	return Statement{expr}
 }
 
 // Set each rule of the grammar as a function
@@ -170,6 +283,10 @@ func primary() Expression {
 		return LiteralExpression{Value: nil}
 	}
 
+	if match(lexer.TokenIdentifier) {
+		return VariableExpression{previous()}
+	}
+
 	if match(lexer.TokenNumber, lexer.TokenString) {
 		return LiteralExpression{Value: previous().Literal}
 	}
@@ -191,7 +308,7 @@ func consume(tokenType int, message string) lexer.Token {
 
 	token := peek()
 
-	errorHandler.RaiseError(errorHandler.CodeSyntaxError, fmt.Sprintf("%d en %v: %v", token.Line, token.Lexeme, message), token.Line, token.Lexeme, true)
+	errorHandler.RaiseError(errorHandler.CodeSyntaxError, message, token.Line, token.Lexeme, true)
 	panic("consume error")
 }
 
