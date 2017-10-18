@@ -10,7 +10,7 @@ import (
 	"strconv"
 )
 
-var env environment.Environment
+var env *environment.Environment
 
 // Interpret takes an AST and interprets it (magic!)
 func Interpret(stmts []parser.Stmt) {
@@ -20,7 +20,10 @@ func Interpret(stmts []parser.Stmt) {
 		}
 	}()
 
-	env = environment.Environment{make(map[string]interface{})}
+	env = &environment.Environment{make(map[string]interface{}), nil}
+
+	env.Define("pi", 3.141592653589793)
+	env.Define("e", 2.718281828459045)
 
 	for _, s := range stmts {
 		execute(s)
@@ -34,7 +37,24 @@ func execute(s parser.Stmt) {
 		evaluatePrint(v)
 	} else if v, ok := s.(parser.Declaration); ok {
 		evaluateDeclaration(v)
+	} else if v, ok := s.(parser.Block); ok {
+		executeBlock(v.Statements, environment.Environment{make(map[string]interface{}), env})
 	}
+}
+
+func executeBlock(statements []parser.Stmt, localEnv environment.Environment) {
+	previousEnv := env
+
+	defer func() {
+		env = previousEnv
+	}()
+
+	env = &localEnv
+
+	for _, statement := range statements {
+		execute(statement)
+	}
+
 }
 
 func evaluateDeclaration(st parser.Declaration) {
@@ -193,6 +213,9 @@ func evaluate(expr parser.Expression) interface{} {
 		return getBinaryValue(v)
 	} else if v, ok := expr.(parser.VariableExpression); ok {
 		return env.Get(v.Name)
+	} else if v, ok := expr.(parser.AssignmentExpression); ok {
+		value := evaluate(v.Value)
+		return env.Assign(v.Name, value)
 	}
 
 	return nil

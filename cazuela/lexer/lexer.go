@@ -144,6 +144,9 @@ func scanNextToken() {
 	case '{':
 		addToken(TokenLeftBrace)
 		break
+	case '}':
+		addToken(TokenRightBrace)
+		break
 	case ',':
 		addToken(TokenComma)
 		break
@@ -184,7 +187,7 @@ func scanNextToken() {
 		} else if isAlpha(character) {
 			parseIdentifier()
 		} else {
-			errorHandler.RaiseError(errorHandler.CodeSyntaxError, fmt.Sprintf("Unexpected character %c", character), line, "", true)
+			errorHandler.RaiseError(errorHandler.CodeSyntaxError, fmt.Sprintf("Caracter desconocido: %c", character), line, "[Preparado]", true)
 		}
 
 	}

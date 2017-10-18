@@ -1,8 +1,10 @@
 package parser
 
-import "clase-mates-computacionales/cazuela/lexer"
-import "clase-mates-computacionales/cazuela/errorHandler"
-import "fmt"
+import (
+	"clase-mates-computacionales/cazuela/errorHandler"
+	"clase-mates-computacionales/cazuela/lexer"
+	"fmt"
+)
 
 /*
 Based on the formal grammar of Lox (http://www.craftinginterpreters.com/)
@@ -15,9 +17,14 @@ declaration → varDecl
 varDecl → "var" IDENTIFIER ( "=" expression )? ";" ;
 
 stmt   		→ statement
-              | print ;
+			  | print
+			  | block ;
 
-expression     → equality ;
+block     	   → "{" declaration* "}" ;
+
+expression     → assignment ;
+assigment      → identifier "=" assignment
+				| equality
 equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 comparison     → addition ( ( ">" | ">=" | "<" | "<=" ) addition )* ;
 addition       → multiplication ( ( "-" | "+" ) multiplication )* ;
@@ -33,15 +40,17 @@ primary        → "true" | "false" | "null" | "this"
 */
 
 const (
-	TypeBinary   = 0x10
-	TypeLiteral  = 0x11
-	TypeGrouping = 0x12
-	TypeUnary    = 0x13
-	TypeVariable = 0x14
+	TypeBinary     = 0x10
+	TypeLiteral    = 0x11
+	TypeGrouping   = 0x12
+	TypeUnary      = 0x13
+	TypeVariable   = 0x14
+	TypeAssignment = 0x15
 
 	TypeStatement   = 0x20
 	TypePrint       = 0x21
 	TypeDeclaration = 0x22
+	TypeBlock       = 0x23
 )
 
 type Stmt interface {
@@ -59,6 +68,10 @@ type Print struct {
 type Declaration struct {
 	Name        lexer.Token
 	Initializer Expression
+}
+
+type Block struct {
+	Statements []Stmt
 }
 
 // Expression is the base interface for all expressions
@@ -93,6 +106,11 @@ type VariableExpression struct {
 	Name lexer.Token
 }
 
+type AssignmentExpression struct {
+	Name  lexer.Token
+	Value Expression
+}
+
 func (st Statement) GetStmtType() int {
 	return TypeStatement
 }
@@ -103,6 +121,10 @@ func (st Print) GetStmtType() int {
 
 func (st Declaration) GetStmtType() int {
 	return TypeDeclaration
+}
+
+func (st Block) GetStmtType() int {
+	return TypeBlock
 }
 
 func (be BinaryExpression) GetType() int {
@@ -123,6 +145,10 @@ func (ue UnaryExpression) GetType() int {
 
 func (ve VariableExpression) GetType() int {
 	return TypeVariable
+}
+
+func (ae AssignmentExpression) GetType() int {
+	return TypeAssignment
 }
 
 var current int
@@ -176,7 +202,22 @@ func statement() Stmt {
 		return printStatement()
 	}
 
+	if match(lexer.TokenLeftBrace) {
+		return Block{block()}
+	}
+
 	return expressionStatement()
+}
+
+func block() []Stmt {
+	statements := make([]Stmt, 1)
+
+	for !check(lexer.TokenRightBrace) && !isAtEnd() {
+		statements = append(statements, declaration())
+	}
+
+	consume(lexer.TokenRightBrace, "Se esperaba un } al final del bloque")
+	return statements
 }
 
 func printStatement() Stmt {
@@ -195,9 +236,26 @@ func expressionStatement() Stmt {
 	return Statement{expr}
 }
 
-// Set each rule of the grammar as a function
 func expression() Expression {
-	return equality()
+	return assignment()
+}
+
+func assignment() Expression {
+	expr := equality()
+
+	if match(lexer.TokenEqual) {
+		equals := previous()
+		value := assignment()
+
+		if v, ok := expr.(VariableExpression); ok {
+			name := v.Name
+			return AssignmentExpression{Name: name, Value: value}
+		}
+
+		errorHandler.RaiseError(errorHandler.CodeSyntaxError, "Lado izquierdo de asignación inválido.", equals.Line, "Cocinado", true)
+	}
+
+	return expr
 }
 
 func equality() Expression {
