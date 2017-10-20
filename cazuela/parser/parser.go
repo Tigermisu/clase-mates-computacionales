@@ -16,23 +16,38 @@ declaration → varDecl
 
 varDecl → "var" IDENTIFIER ( "=" expression )? ";" ;
 
-stmt   		→ statement
-			  | print
-			  | block ;
+stmt   		   → statement
+				| print
+				| block
+				| while
+				| if
+				| forLoop
 
+forLoop		  → "por" "(" ( varDecl | exprStmt | ";" )
+				expression? ";"
+				expression? ")" statement ;
+
+if			   → "si" "(" expression ")" statement ( "nope" statement )? ;
 block     	   → "{" declaration* "}" ;
+while 	       → "mientras" "(" expression ")" statement ;
 
 expression     → assignment ;
-assigment      → identifier "=" assignment
-				| equality
+
+assigment      → identifier "=" assignment\
+				| logic_or ;
+
+logic_or  	   → logic_and ( "o" logic_and )* ;
+logic_and  	   → equality ( "y" equality )* ;
 equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 comparison     → addition ( ( ">" | ">=" | "<" | "<=" ) addition )* ;
 addition       → multiplication ( ( "-" | "+" ) multiplication )* ;
 multiplication → exponentiation ( ( "/" | "*" | "%" ) exponentiation )* ;
 exponentiation → unary ( ( "^" ) unary )* ;
 unary          → ( "!" | "-" ) unary ;
-                 | primary ;
-primary        → "true" | "false" | "null" | "this"
+				 | call ;
+call		   → primary ( "(" arguments? ")" )* ;
+arguments 	   → expression ( "," expression )* ;
+primary        → "verdadero" | "falso" | "nulo"
 				 | NUMBER | STRING
 				 | "(" expression ")"
 				 | IDENTIFIER ;
@@ -46,11 +61,15 @@ const (
 	TypeUnary      = 0x13
 	TypeVariable   = 0x14
 	TypeAssignment = 0x15
+	TypeLogical    = 0x16
+	TypeWhile      = 0x17
+	TypeCall       = 0x18
 
 	TypeStatement   = 0x20
 	TypePrint       = 0x21
 	TypeDeclaration = 0x22
 	TypeBlock       = 0x23
+	TypeIf          = 0x24
 )
 
 type Stmt interface {
@@ -72,6 +91,17 @@ type Declaration struct {
 
 type Block struct {
 	Statements []Stmt
+}
+
+type If struct {
+	Condition  Expression
+	ThenBranch Stmt
+	ElseBranch Stmt
+}
+
+type While struct {
+	Condition Expression
+	Body      Stmt
 }
 
 // Expression is the base interface for all expressions
@@ -111,6 +141,18 @@ type AssignmentExpression struct {
 	Value Expression
 }
 
+type LogicalExpression struct {
+	Left     Expression
+	Operator lexer.Token
+	Right    Expression
+}
+
+type CallExpression struct {
+	Callee            Expression
+	ClosingParenteses lexer.Token
+	Arguments         []Expression
+}
+
 func (st Statement) GetStmtType() int {
 	return TypeStatement
 }
@@ -125,6 +167,14 @@ func (st Declaration) GetStmtType() int {
 
 func (st Block) GetStmtType() int {
 	return TypeBlock
+}
+
+func (st If) GetStmtType() int {
+	return TypeIf
+}
+
+func (st While) GetStmtType() int {
+	return TypeWhile
 }
 
 func (be BinaryExpression) GetType() int {
@@ -149,6 +199,14 @@ func (ve VariableExpression) GetType() int {
 
 func (ae AssignmentExpression) GetType() int {
 	return TypeAssignment
+}
+
+func (lo LogicalExpression) GetType() int {
+	return TypeLogical
+}
+
+func (ca CallExpression) GetType() int {
+	return TypeCall
 }
 
 var current int
@@ -198,12 +256,24 @@ func varDeclaration() Stmt {
 }
 
 func statement() Stmt {
-	if match(lexer.TokenPrint) {
-		return printStatement()
+	if match(lexer.TokenIf) {
+		return ifStatement()
 	}
 
 	if match(lexer.TokenLeftBrace) {
 		return Block{block()}
+	}
+
+	if match(lexer.TokenPrint) {
+		return printStatement()
+	}
+
+	if match(lexer.TokenWhile) {
+		return whileStatement()
+	}
+
+	if match(lexer.TokenFor) {
+		return forStatement()
 	}
 
 	return expressionStatement()
@@ -216,7 +286,7 @@ func block() []Stmt {
 		statements = append(statements, declaration())
 	}
 
-	consume(lexer.TokenRightBrace, "Se esperaba un } al final del bloque")
+	consume(lexer.TokenRightBrace, "Se esperaba un } al final del bloque.")
 	return statements
 }
 
@@ -228,6 +298,48 @@ func printStatement() Stmt {
 	return Print{value}
 }
 
+// Caramelizer for whiles
+func forStatement() Stmt {
+	consume(lexer.TokenLeftParentheses, "Se esperaba un ( después de 'por'.")
+	var initializer Stmt
+	if match(lexer.TokenLet) {
+		initializer = varDeclaration()
+	} else if !match(lexer.TokenSemiColon) {
+		initializer = expressionStatement()
+	}
+
+	var condition Expression
+	if !check(lexer.TokenSemiColon) {
+		condition = expression()
+	}
+	consume(lexer.TokenSemiColon, "Se esperaba un ; después de la condición.")
+
+	var increment Expression
+	if !check(lexer.TokenRightParenteses) {
+		increment = expression()
+	}
+
+	consume(lexer.TokenRightParenteses, "Se esperaba un ) después del 'por'.")
+
+	body := statement()
+
+	if increment != nil {
+		body = Block{[]Stmt{body, Statement{increment}}}
+	}
+
+	if condition == nil {
+		condition = LiteralExpression{true}
+	}
+
+	body = While{condition, body}
+
+	if initializer != nil {
+		body = Block{[]Stmt{initializer, body}}
+	}
+
+	return body
+}
+
 func expressionStatement() Stmt {
 	expr := expression()
 
@@ -236,12 +348,37 @@ func expressionStatement() Stmt {
 	return Statement{expr}
 }
 
+func ifStatement() Stmt {
+	consume(lexer.TokenLeftParentheses, "Se esperaba un ( en la condición.")
+	condition := expression()
+	consume(lexer.TokenRightParenteses, "Se esperaba un ) al final de la condición.")
+
+	thenBranch := statement()
+	var elseBranch Stmt
+
+	if match(lexer.TokenElse) {
+		elseBranch = statement()
+	}
+
+	return If{condition, thenBranch, elseBranch}
+}
+
+func whileStatement() Stmt {
+	consume(lexer.TokenLeftParentheses, "Se esperaba un ( en la condición.")
+	condition := expression()
+	consume(lexer.TokenRightParenteses, "Se esperaba un ) al final de la condición.")
+
+	body := statement()
+
+	return While{condition, body}
+}
+
 func expression() Expression {
 	return assignment()
 }
 
 func assignment() Expression {
-	expr := equality()
+	expr := or()
 
 	if match(lexer.TokenEqual) {
 		equals := previous()
@@ -253,6 +390,30 @@ func assignment() Expression {
 		}
 
 		errorHandler.RaiseError(errorHandler.CodeSyntaxError, "Lado izquierdo de asignación inválido.", equals.Line, "Cocinado", true)
+	}
+
+	return expr
+}
+
+func or() Expression {
+	expr := and()
+
+	for match(lexer.TokenOr) {
+		operator := previous()
+		right := and()
+		expr = LogicalExpression{expr, operator, right}
+	}
+
+	return expr
+}
+
+func and() Expression {
+	expr := equality()
+
+	for match(lexer.TokenAnd) {
+		operator := previous()
+		right := equality()
+		expr = LogicalExpression{expr, operator, right}
 	}
 
 	return expr
@@ -325,7 +486,36 @@ func unary() Expression {
 		return UnaryExpression{Operator: operator, Right: right}
 	}
 
-	return primary()
+	return call()
+}
+
+func call() Expression {
+	expr := primary()
+
+	for {
+		if match(lexer.TokenLeftParentheses) {
+			expr = finishCall(expr)
+		} else {
+			break
+		}
+	}
+
+	return expr
+}
+
+func finishCall(callee Expression) Expression {
+	arguments := make([]Expression, 1)
+
+	if !check(lexer.TokenRightParenteses) {
+		arguments = append(arguments, expression())
+		for match(lexer.TokenComma) {
+			arguments = append(arguments, expression())
+		}
+	}
+
+	paren := consume(lexer.TokenRightParenteses, "Se esperaba un ) al final de la llamada.")
+
+	return CallExpression{callee, paren, arguments}
 }
 
 func primary() Expression {

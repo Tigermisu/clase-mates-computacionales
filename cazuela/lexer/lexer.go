@@ -63,7 +63,7 @@ var keywords = map[string]int{
 	"verdadero": TokenTrue,
 	"falso":     TokenFalse,
 	"si":        TokenIf,
-	"opuesto":   TokenElse,
+	"nope":      TokenElse,
 	"fn":        TokenFunction,
 	"por":       TokenFor,
 	"mientras":  TokenWhile,

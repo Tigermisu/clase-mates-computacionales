@@ -1,0 +1,24 @@
+var azucar = 0;
+var carne = 1;
+
+servir "Probando condicionales";
+si (4 != 2 y azucar > carne o carne == azucar) {
+  servir "oregano";
+} nope si ("esto tambien se puede") {
+  servir "cebolla";
+} nope {
+  servir "repollo";
+}
+
+var a = 0;
+var b = 1;
+
+servir "";
+servir "Empieza Fibonacci";
+
+por (var i = 0; i < 30; i = i + 1) {
+  servir a;
+  var temp = a;
+  a = b;
+  b = temp + b;
+}

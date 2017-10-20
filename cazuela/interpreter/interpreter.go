@@ -12,6 +12,11 @@ import (
 
 var env *environment.Environment
 
+type Callable interface {
+	arity() int
+	Call([]interface{}) interface{}
+}
+
 // Interpret takes an AST and interprets it (magic!)
 func Interpret(stmts []parser.Stmt) {
 	defer func() {
@@ -39,6 +44,16 @@ func execute(s parser.Stmt) {
 		evaluateDeclaration(v)
 	} else if v, ok := s.(parser.Block); ok {
 		executeBlock(v.Statements, environment.Environment{make(map[string]interface{}), env})
+	} else if v, ok := s.(parser.If); ok {
+		executeIf(v)
+	} else if v, ok := s.(parser.While); ok {
+		executeWhile(v)
+	}
+}
+
+func executeWhile(v parser.While) {
+	for isTruthy(evaluate(v.Condition)) {
+		execute(v.Body)
 	}
 }
 
@@ -73,6 +88,14 @@ func evaluateStatement(st parser.Statement) {
 func evaluatePrint(st parser.Print) {
 	value := evaluate(st.Expr)
 	fmt.Println(value)
+}
+
+func executeIf(ifStmt parser.If) {
+	if isTruthy(evaluate(ifStmt.Condition)) {
+		execute(ifStmt.ThenBranch)
+	} else if ifStmt.ElseBranch != nil {
+		execute(ifStmt.ElseBranch)
+	}
 }
 
 func getLiteralValue(expr parser.LiteralExpression) interface{} {
@@ -202,6 +225,41 @@ func isTruthy(v interface{}) bool {
 	return true
 }
 
+func evaluateLogicalExpression(expr parser.LogicalExpression) interface{} {
+	left := evaluate(expr.Left)
+
+	if expr.Operator.TokenType == lexer.TokenOr {
+		if isTruthy(left) {
+			return left
+		}
+	} else if !isTruthy(left) {
+		return left
+	}
+
+	return evaluate(expr.Right)
+}
+
+func evaluateCallExpression(expr parser.CallExpression) interface{} {
+	callee := evaluate(expr.Callee)
+
+	arguments := make([]interface{}, 1)
+
+	for _, arg := range expr.Arguments {
+		arguments = append(arguments, evaluate(arg))
+	}
+
+	if fn, ok := callee.(Callable); ok {
+		if len(arguments) != fn.arity() {
+			errorHandler.RaiseError(errorHandler.CodeRuntimeError, fmt.Sprintf("Se esperaban %d argumentos pero se recibieron %d", fn.arity(), len(arguments)), expr.ClosingParenteses.Line, "Función", true)
+		}
+		return fn.Call(arguments)
+	}
+
+	errorHandler.RaiseError(errorHandler.CodeRuntimeError, "Se intentó llamar algo que no es una función", expr.ClosingParenteses.Line, "Función", true)
+	return nil
+
+}
+
 func evaluate(expr parser.Expression) interface{} {
 	if v, ok := expr.(parser.LiteralExpression); ok {
 		return getLiteralValue(v)
@@ -216,6 +274,10 @@ func evaluate(expr parser.Expression) interface{} {
 	} else if v, ok := expr.(parser.AssignmentExpression); ok {
 		value := evaluate(v.Value)
 		return env.Assign(v.Name, value)
+	} else if v, ok := expr.(parser.LogicalExpression); ok {
+		return evaluateLogicalExpression(v)
+	} else if v, ok := expr.(parser.CallExpression); ok {
+		return evaluateCallExpression(v)
 	}
 
 	return nil
