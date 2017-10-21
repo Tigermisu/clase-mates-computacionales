@@ -12,6 +12,7 @@ import (
 
 func main() {
 	args := os.Args
+	interpreter.InitEnv()
 	if len(args) > 2 {
 		fmt.Println("Uso: cazuela [archivo]")
 		errorHandler.RaiseErrorWithCode(errorHandler.CodeTooManyArguments)
@@ -25,6 +26,7 @@ func main() {
 
 func startLineInterpreter() {
 	errorHandler.IgnoreFatals = true
+	interpreter.ShouldPrintAllExpressions = true
 	for {
 		fmt.Print("<Cazuela># ")
 		input := utilities.GetConsoleInput()

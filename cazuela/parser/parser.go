@@ -12,9 +12,14 @@ Based on the formal grammar of Lox (http://www.craftinginterpreters.com/)
 program     → declaration* eof ;
 
 declaration → varDecl
+			  | fnDecl
               | stmt ;
 
-varDecl → "var" IDENTIFIER ( "=" expression )? ";" ;
+varDecl		→ "var" IDENTIFIER ( "=" expression )? ";" ;
+
+fnDecl  	→ "fn" function ;
+function 	→ IDENTIFIER "(" parameters? ")" block ;
+parameters → IDENTIFIER ( "," IDENTIFIER )* ;
 
 stmt   		   → statement
 				| print
@@ -22,10 +27,13 @@ stmt   		   → statement
 				| while
 				| if
 				| forLoop
+				| ReturnStmt
 
 forLoop		  → "por" "(" ( varDecl | exprStmt | ";" )
 				expression? ";"
 				expression? ")" statement ;
+
+ReturnStmt 	  → "sazonar" expression? ";" ;
 
 if			   → "si" "(" expression ")" statement ( "nope" statement )? ;
 block     	   → "{" declaration* "}" ;
@@ -64,6 +72,8 @@ const (
 	TypeLogical    = 0x16
 	TypeWhile      = 0x17
 	TypeCall       = 0x18
+	TypeFn         = 0x19
+	TypeReturn     = 0x1A
 
 	TypeStatement   = 0x20
 	TypePrint       = 0x21
@@ -102,6 +112,17 @@ type If struct {
 type While struct {
 	Condition Expression
 	Body      Stmt
+}
+
+type FnDecl struct {
+	Name       lexer.Token
+	Parameters []lexer.Token
+	Body       []Stmt
+}
+
+type ReturnStmt struct {
+	Keyword lexer.Token
+	Value   Expression
 }
 
 // Expression is the base interface for all expressions
@@ -177,6 +198,14 @@ func (st While) GetStmtType() int {
 	return TypeWhile
 }
 
+func (st FnDecl) GetStmtType() int {
+	return TypeFn
+}
+
+func (st ReturnStmt) GetStmtType() int {
+	return TypeReturn
+}
+
 func (be BinaryExpression) GetType() int {
 	return TypeBinary
 }
@@ -237,7 +266,31 @@ func declaration() Stmt {
 		return varDeclaration()
 	}
 
+	if match(lexer.TokenFunction) {
+		return function()
+	}
+
 	return statement()
+}
+
+func function() FnDecl {
+	name := consume(lexer.TokenIdentifier, "Se esperaba un nombre de función.")
+	consume(lexer.TokenLeftParentheses, "Se esperaba un ( después del nombre de la función.")
+	parameters := make([]lexer.Token, 1)
+
+	if !check(lexer.TokenRightParenteses) {
+		parameters = append(parameters, consume(lexer.TokenIdentifier, "Se esperaba nombre del parámetro"))
+		for match(lexer.TokenComma) {
+			parameters = append(parameters, consume(lexer.TokenIdentifier, "Se esperaba nombre del parámetro"))
+		}
+	}
+	consume(lexer.TokenRightParenteses, "Se esperaba un ) después de los parámetros de la función")
+
+	consume(lexer.TokenLeftBrace, "Se esperaba un { al empezar la función.")
+
+	body := block()
+
+	return FnDecl{name, parameters, body}
 }
 
 func varDeclaration() Stmt {
@@ -276,6 +329,10 @@ func statement() Stmt {
 		return forStatement()
 	}
 
+	if match(lexer.TokenReturn) {
+		return returnStatement()
+	}
+
 	return expressionStatement()
 }
 
@@ -288,6 +345,20 @@ func block() []Stmt {
 
 	consume(lexer.TokenRightBrace, "Se esperaba un } al final del bloque.")
 	return statements
+}
+
+func returnStatement() Stmt {
+	keyword := previous()
+
+	var value Expression
+
+	if !check(lexer.TokenSemiColon) {
+		value = expression()
+	}
+
+	consume(lexer.TokenSemiColon, "Se esperaba un ; al final del sazonado")
+
+	return ReturnStmt{keyword, value}
 }
 
 func printStatement() Stmt {

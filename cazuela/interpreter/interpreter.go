@@ -12,9 +12,44 @@ import (
 
 var env *environment.Environment
 
+var ShouldPrintAllExpressions = false
+
 type Callable interface {
 	arity() int
 	Call([]interface{}) interface{}
+}
+
+type CazuelaFunction struct {
+	declaration parser.FnDecl
+}
+
+func (f CazuelaFunction) Call(arguments []interface{}) (response interface{}) {
+	localEnv := environment.Environment{make(map[string]interface{}), env}
+
+	for i := 0; i < len(arguments); i++ {
+		localEnv.Define(f.declaration.Parameters[i].Lexeme, arguments[i])
+	}
+
+	defer func() {
+		if returnValue := recover(); returnValue != nil {
+			response = returnValue
+		}
+	}()
+
+	executeBlock(f.declaration.Body, localEnv)
+
+	return
+}
+
+func (f CazuelaFunction) arity() int {
+	return len(f.declaration.Parameters)
+}
+
+func InitEnv() {
+	env = &environment.Environment{make(map[string]interface{}), nil}
+
+	env.Define("pi", 3.141592653589793)
+	env.Define("e", 2.718281828459045)
 }
 
 // Interpret takes an AST and interprets it (magic!)
@@ -24,11 +59,6 @@ func Interpret(stmts []parser.Stmt) {
 			errorHandler.RaiseError(errorHandler.CodeRuntimeError, "Error interno en tiempo de ejecución", -1, fmt.Sprintf("%v", err), true)
 		}
 	}()
-
-	env = &environment.Environment{make(map[string]interface{}), nil}
-
-	env.Define("pi", 3.141592653589793)
-	env.Define("e", 2.718281828459045)
 
 	for _, s := range stmts {
 		execute(s)
@@ -48,6 +78,11 @@ func execute(s parser.Stmt) {
 		executeIf(v)
 	} else if v, ok := s.(parser.While); ok {
 		executeWhile(v)
+	} else if v, ok := s.(parser.FnDecl); ok {
+		fn := CazuelaFunction{v}
+		env.Define(v.Name.Lexeme, fn)
+	} else if v, ok := s.(parser.ReturnStmt); ok {
+		executeReturn(v)
 	}
 }
 
@@ -55,6 +90,15 @@ func executeWhile(v parser.While) {
 	for isTruthy(evaluate(v.Condition)) {
 		execute(v.Body)
 	}
+}
+
+func executeReturn(v parser.ReturnStmt) {
+	var value interface{}
+	if v.Value != nil {
+		value = evaluate(v.Value)
+	}
+
+	panic(value)
 }
 
 func executeBlock(statements []parser.Stmt, localEnv environment.Environment) {
@@ -82,7 +126,11 @@ func evaluateDeclaration(st parser.Declaration) {
 }
 
 func evaluateStatement(st parser.Statement) {
-	evaluate(st.Expr)
+	r := evaluate(st.Expr)
+
+	if ShouldPrintAllExpressions {
+		fmt.Printf("<| %v |>\n", r)
+	}
 }
 
 func evaluatePrint(st parser.Print) {
@@ -242,7 +290,7 @@ func evaluateLogicalExpression(expr parser.LogicalExpression) interface{} {
 func evaluateCallExpression(expr parser.CallExpression) interface{} {
 	callee := evaluate(expr.Callee)
 
-	arguments := make([]interface{}, 1)
+	arguments := make([]interface{}, 0)
 
 	for _, arg := range expr.Arguments {
 		arguments = append(arguments, evaluate(arg))
@@ -252,7 +300,8 @@ func evaluateCallExpression(expr parser.CallExpression) interface{} {
 		if len(arguments) != fn.arity() {
 			errorHandler.RaiseError(errorHandler.CodeRuntimeError, fmt.Sprintf("Se esperaban %d argumentos pero se recibieron %d", fn.arity(), len(arguments)), expr.ClosingParenteses.Line, "Función", true)
 		}
-		return fn.Call(arguments)
+		received := fn.Call(arguments)
+		return received
 	}
 
 	errorHandler.RaiseError(errorHandler.CodeRuntimeError, "Se intentó llamar algo que no es una función", expr.ClosingParenteses.Line, "Función", true)

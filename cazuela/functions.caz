@@ -1,0 +1,20 @@
+fn confesar(comida, sazonDespreciado) {
+  servir "La verdad, prefiero " + comida + " a un menudo estilo " + sazonDespreciado + ".";
+}
+
+confesar("Guacamole", "Sonora");
+
+servir " ";
+servir "Empieza fibonacci";
+
+
+fn fibonacci(n) {
+  si (n <= 1) {
+    sazonar n;
+  }
+  sazonar fibonacci(n - 2) + fibonacci(n - 1);
+}
+
+por (var i = 0; i < 10; i = i + 1) {
+  servir fibonacci(i);
+}
